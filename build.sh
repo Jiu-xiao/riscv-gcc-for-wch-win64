@@ -78,13 +78,25 @@ run_gcc_tool() {
   local exe="$1"
   shift
   local dir win_dir win_gas win_ld sysroot sysinc_win
+  local need_cc1
   local -a extra_args
   for dir in "${gcc_dirs[@]}"; do
     if [ -f "${dir}/${exe}" ]; then
       # xgcc/xg++ can exist before cc1 is built in a stage dir; skip that dir.
       case "$exe" in
         xgcc.exe|xg++.exe|cpp.exe)
-          if [ ! -f "${dir}/cc1.exe" ]; then
+          need_cc1=1
+          # GCC stage1 runs metadata queries such as "-dumpspecs" before cc1.exe
+          # is available. Those invocations are valid and should not be skipped.
+          for a in "$@"; do
+            case "$a" in
+              -dumpspecs|-dumpmachine|-dumpversion|-dumpfullversion|-print-multi-lib|-print-search-dirs|-print-sysroot|-print-libgcc-file-name|-print-file-name=*|-print-prog-name=*)
+                need_cc1=0
+                break
+                ;;
+            esac
+          done
+          if [ "$need_cc1" -eq 1 ] && [ ! -f "${dir}/cc1.exe" ]; then
             continue
           fi
           ;;

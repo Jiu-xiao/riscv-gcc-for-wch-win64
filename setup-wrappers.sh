@@ -43,8 +43,25 @@ run_gcc_tool() {
   local exe="$1"
   shift
   local dir win_dir win_gas win_ld
+  local need_cc1
   for dir in "${gcc_dirs[@]}"; do
     if [ -f "${dir}/${exe}" ]; then
+      case "$exe" in
+        xgcc.exe|xg++.exe|cpp.exe)
+          need_cc1=1
+          for a in "$@"; do
+            case "$a" in
+              -dumpspecs|-dumpmachine|-dumpversion|-dumpfullversion|-print-multi-lib|-print-search-dirs|-print-sysroot|-print-libgcc-file-name|-print-file-name=*|-print-prog-name=*)
+                need_cc1=0
+                break
+                ;;
+            esac
+          done
+          if [ "$need_cc1" -eq 1 ] && [ ! -f "${dir}/cc1.exe" ]; then
+            continue
+          fi
+          ;;
+      esac
       win_dir=$(to_win_path "$dir")
       win_gas=$(to_win_path "$binutils_root/gas")
       win_ld=$(to_win_path "$binutils_root/ld")

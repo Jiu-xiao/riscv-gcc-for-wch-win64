@@ -1,0 +1,78 @@
+﻿set -euxo pipefail
+
+# Prepare wine wrappers so Canadian-cross binaries can run under wine.
+mkdir -p /opt/wine-wrappers
+cat > /opt/wine-wrappers/riscv32-unknown-elf-wrapper <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+tool=$(basename "$0")
+prefix=/opt/riscv
+build_root=/src
+candidates=(
+  "$build_root/build-gcc-newlib-stage1/gcc"
+  "$build_root/build-gcc-newlib/gcc"
+  "$build_root/build-gcc-newlib-stage2/gcc"
+)
+
+case "$tool" in
+  riscv32-unknown-elf-gcc) exes=(xgcc.exe) ;;
+  riscv32-unknown-elf-g++) exes=(xg++.exe) ;;
+  riscv32-unknown-elf-cpp) exes=(cpp.exe) ;;
+  riscv32-unknown-elf-gcc-ar) exes=(gcc-ar.exe) ;;
+  riscv32-unknown-elf-gcc-nm) exes=(gcc-nm.exe) ;;
+  riscv32-unknown-elf-gcc-ranlib) exes=(gcc-ranlib.exe) ;;
+  *) exes=("${tool}.exe") ;;
+ esac
+
+for dir in "${candidates[@]}"; do
+  for exe in "${exes[@]}"; do
+    if [ -f "${dir}/${exe}" ]; then
+      exec wine "${dir}/${exe}" "$@"
+    fi
+  done
+ done
+
+if [ -f "${prefix}/bin/${tool}.exe" ]; then
+  exec wine "${prefix}/bin/${tool}.exe" "$@"
+fi
+
+echo "wrapper: missing tool for ${tool}" >&2
+exit 127
+EOF
+chmod +x /opt/wine-wrappers/riscv32-unknown-elf-wrapper
+
+for t in gcc g++ cpp gcc-ar gcc-nm gcc-ranlib ar ranlib nm as ld strip objcopy objdump size; do
+  ln -sf /opt/wine-wrappers/riscv32-unknown-elf-wrapper "/opt/wine-wrappers/riscv32-unknown-elf-${t}"
+done
+
+export PATH=/opt/wine-wrappers:$PATH
+wineboot -u
+
+# Clone and build riscv-gnu-toolchain (mainline) with mirrors for blocked submodules.
+git clone --depth=1 https://github.com/riscv-collab/riscv-gnu-toolchain /src
+cd /src
+
+git config -f .gitmodules submodule.binutils.url https://gnu.googlesource.com/binutils-gdb
+git config -f .gitmodules submodule.gdb.url https://gnu.googlesource.com/binutils-gdb
+git config -f .gitmodules submodule.newlib.url https://github.com/RTEMS/sourceware-mirror-newlib-cygwin
+
+git submodule sync -- binutils gdb newlib
+git submodule update --init --depth=1 --jobs "$(nproc)" binutils gcc newlib gdb
+
+cd /src/gcc
+./contrib/download_prerequisites
+
+cd /src
+./configure \
+  --prefix=/opt/riscv \
+  --with-arch=rv32gc \
+  --with-abi=ilp32 \
+  --with-multilib-generator="rv32imac-ilp32--zicsr*zifencei*zaamo*zalrsc;rv32imafc-ilp32f--zicsr*zifencei*zaamo*zalrsc" \
+  --enable-languages=c,c++ \
+  --disable-gdb
+
+make -j"$(nproc)" CONFIGURE_HOST=--host=x86_64-w64-mingw32
+make CONFIGURE_HOST=--host=x86_64-w64-mingw32 install
+
+tar -C /opt -cf /out/riscv-rv32-win.tar riscv

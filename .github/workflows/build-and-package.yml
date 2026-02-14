@@ -1,0 +1,83 @@
+name: build-and-package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build_toolchain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 720
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          set -euxo pipefail
+          docker build -f Dockerfile.builder -t riscv-gcc-builder-full .
+
+      - name: Build toolchain in container
+        run: |
+          set -euxo pipefail
+          mkdir -p out
+          docker run --rm \
+            -e JOBS_STAGE1=32 \
+            -e JOBS_FINAL=32 \
+            -e MAKE_RETRIES=6 \
+            -e MAKE_RETRY_DELAY=8 \
+            -v "${{ github.workspace }}:/work" \
+            -v "${{ github.workspace }}/out:/out" \
+            riscv-gcc-builder-full \
+            /bin/bash -lc "bash /work/build.sh"
+
+      - name: Verify toolchain files
+        run: |
+          set -euxo pipefail
+          test -f out/riscv/bin/riscv32-unknown-elf-gcc.exe
+          test -f out/riscv/bin/riscv32-unknown-elf-g++.exe
+          test -f out/riscv/bin/riscv32-unknown-elf-gdb.exe
+          test -f out/riscv/bin/riscv32-unknown-elf-readelf.exe
+          test -f out/riscv/bin/libstdc++-6.dll
+          test -f out/riscv/bin/libgcc_s_seh-1.dll
+
+      - name: Upload toolchain artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv-toolchain-dir
+          path: out/riscv
+          if-no-files-found: error
+          compression-level: 0
+
+  build_installer:
+    needs: build_toolchain
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download toolchain artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: riscv-toolchain-dir
+          path: out/riscv
+
+      - name: Build installer exe
+        shell: powershell
+        run: |
+          .\build-installer.ps1
+
+      - name: Smoke test installer
+        shell: powershell
+        run: |
+          .\test-installer.ps1 -SourceDir (Join-Path $pwd 'out\riscv')
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv-toolchain-installer
+          path: out/installer/riscv-toolchain-installer.exe
+          if-no-files-found: error

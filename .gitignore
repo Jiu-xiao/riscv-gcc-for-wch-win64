@@ -1,0 +1,8 @@
+out/
+binutils-copy/
+smoke*/
+*.log
+*.log.bak
+cc1.exe
+xgcc.exe
+*.tar

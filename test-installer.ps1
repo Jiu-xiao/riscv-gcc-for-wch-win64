@@ -91,6 +91,7 @@ $required = @(
   (Join-Path $InstallDir "bin\\riscv32-unknown-elf-readelf.exe"),
   (Join-Path $InstallDir "bin\\libstdc++-6.dll"),
   (Join-Path $InstallDir "bin\\libgcc_s_seh-1.dll"),
+  (Join-Path $InstallDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
   (Join-Path $InstallDir "riscv32-unknown-elf\\include\\stdio.h"),
   (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\libstdc++.a")
 )

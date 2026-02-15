@@ -144,6 +144,7 @@ $requiredInExtract = @(
   (Join-Path $extractedSource "bin\\riscv32-unknown-elf-readelf.exe"),
   (Join-Path $extractedSource "bin\\libstdc++-6.dll"),
   (Join-Path $extractedSource "bin\\libgcc_s_seh-1.dll"),
+  (Join-Path $extractedSource "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
   (Join-Path $extractedSource "riscv32-unknown-elf\\include\\stdio.h"),
   (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\libstdc++.a")
 )
@@ -193,6 +194,7 @@ $required = @(
   (Join-Path $installDir "bin\\riscv32-unknown-elf-readelf.exe"),
   (Join-Path $installDir "bin\\libstdc++-6.dll"),
   (Join-Path $installDir "bin\\libgcc_s_seh-1.dll"),
+  (Join-Path $installDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
   (Join-Path $installDir "riscv32-unknown-elf\\include\\stdio.h"),
   (Join-Path $installDir "riscv32-unknown-elf\\lib\\libstdc++.a")
 )

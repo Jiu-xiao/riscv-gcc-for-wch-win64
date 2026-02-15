@@ -97,11 +97,9 @@ extract_depfile_from_args() {
 sanitize_depfile_for_make() {
   local dep="$1"
   [ -n "$dep" ] || return 0
-  [ -f "$dep" ] || return 0
-  # GCC under Wine can emit CRLF + drive-letter prerequisites (for example
-  # "Z:\...") that GNU make parses as a static pattern rule and aborts.
-  # Normalize paths so dep files are parseable on Linux-hosted make.
-  perl -i -pe "s/\r$//; s{(^|[ \t\\\\])([A-Za-z]):\\\\+}{\$1/}g; s{\\\\}{/}g" "$dep" || true
+  # Under Wine-hosted target gcc, generated .dep files can intermittently be
+  # malformed for GNU make. Dependency tracking is optional here, so drop them.
+  rm -f "$dep" 2>/dev/null || true
 }
 
 run_gcc_tool() {

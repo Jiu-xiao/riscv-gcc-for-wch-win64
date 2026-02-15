@@ -187,6 +187,10 @@ jobs:
           if (!(Test-Path $fullExe)) {
             throw "Missing full installer: $fullExe"
           }
+          $sevenZip = Join-Path $env:ProgramFiles "7-Zip\7z.exe"
+          if (!(Test-Path $sevenZip)) {
+            throw "Missing 7-Zip executable: $sevenZip"
+          }
 
           $installDir = Join-Path $pwd "out\full-install-test"
           $extractDir = Join-Path $pwd "out\full-extract-test"
@@ -197,9 +201,13 @@ jobs:
             Remove-Item -Recurse -Force $extractDir
           }
 
-          & $fullExe -y "-o$extractDir"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Full installer extraction failed with rc=$LASTEXITCODE"
+          Write-Host "Using extractor: $sevenZip"
+          Write-Host "Full installer: $fullExe"
+          Write-Host "Extract dir: $extractDir"
+          & $sevenZip x -y "-o$extractDir" $fullExe
+          $extractRc = if ($null -eq $LASTEXITCODE) { -99999 } else { [int]$LASTEXITCODE }
+          if ($extractRc -ne 0) {
+            throw "Full installer extraction via 7z failed with rc=$extractRc"
           }
 
           $extractedInstaller = Join-Path $extractDir "installer\riscv-toolchain-installer.exe"

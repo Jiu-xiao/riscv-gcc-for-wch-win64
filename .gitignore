@@ -6,3 +6,5 @@ smoke*/
 cc1.exe
 xgcc.exe
 *.tar
+tools/
+.known_hosts

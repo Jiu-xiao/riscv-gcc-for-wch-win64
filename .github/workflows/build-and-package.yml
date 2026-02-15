@@ -6,6 +6,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: write
+
 jobs:
   build_toolchain:
     runs-on: ubuntu-latest
@@ -54,7 +57,7 @@ jobs:
   build_installer:
     needs: build_toolchain
     runs-on: windows-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -81,3 +84,75 @@ jobs:
           name: riscv-toolchain-installer
           path: out/installer/riscv-toolchain-installer.exe
           if-no-files-found: error
+
+      - name: Install 7-Zip
+        shell: powershell
+        run: |
+          choco install 7zip -y --no-progress
+
+      - name: Build single-file full installer (SFX EXE)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $releaseDir = Join-Path $pwd "out\release"
+          $bundleDir = Join-Path $pwd "out\bundle"
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
+
+          $installCmd = Join-Path $bundleDir "install.cmd"
+          @'
+          @echo off
+          setlocal
+          for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
+          "%ROOT%installer\riscv-toolchain-installer.exe" --source "%ROOT%riscv" %*
+          exit /b %ERRORLEVEL%
+          '@ | Set-Content -Path $installCmd -Encoding Ascii
+
+          $cfg = Join-Path $bundleDir "sfx-config.txt"
+          @'
+          ;!@Install@!UTF-8!
+          Title="RISC-V Toolchain Installer"
+          RunProgram="bundle\\install.cmd"
+          ;!@InstallEnd@!
+          '@ | Set-Content -Path $cfg -Encoding Ascii
+
+          $archive = Join-Path $bundleDir "payload.7z"
+          if (Test-Path $archive) { Remove-Item -Force $archive }
+
+          Push-Location out
+          & "$env:ProgramFiles\7-Zip\7z.exe" a -t7z -mx=9 "$archive" "riscv\*" "installer\riscv-toolchain-installer.exe" "bundle\install.cmd"
+          if ($LASTEXITCODE -ne 0) {
+            throw "7z archive failed with rc=$LASTEXITCODE"
+          }
+          Pop-Location
+
+          $sfx = Join-Path $env:ProgramFiles "7-Zip\7z.sfx"
+          if (!(Test-Path $sfx)) {
+            throw "Missing SFX module: $sfx"
+          }
+
+          $fullExe = Join-Path $releaseDir "riscv-toolchain-full-installer.exe"
+          cmd /c copy /b /y "$sfx+$cfg+$archive" "$fullExe"
+          if ($LASTEXITCODE -ne 0) {
+            throw "SFX combine failed with rc=$LASTEXITCODE"
+          }
+
+          Get-Item $fullExe | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Upload full installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv-toolchain-full-installer-exe
+          path: out/release/riscv-toolchain-full-installer.exe
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish GitHub release (one EXE per push)
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: push-${{ github.sha }}
+          name: push-${{ github.sha }}
+          target_commitish: ${{ github.sha }}
+          files: out/release/riscv-toolchain-full-installer.exe
+          fail_on_unmatched_files: true

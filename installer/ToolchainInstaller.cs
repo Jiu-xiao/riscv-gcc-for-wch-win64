@@ -74,6 +74,7 @@ internal static class Program
             }
 
             CopyDirectory(stagedRoot, target);
+            EnsureTargetBinutilsCompat(target);
             ValidateInstalled(target);
 
             if (options.AddPath)
@@ -276,6 +277,42 @@ internal static class Program
             if (!File.Exists(file))
             {
                 throw new InvalidOperationException("Installed output missing: " + file);
+            }
+        }
+    }
+
+    private static void EnsureTargetBinutilsCompat(string installRoot)
+    {
+        string hostBin = Path.Combine(installRoot, "bin");
+        string targetBin = Path.Combine(installRoot, "riscv32-unknown-elf", "bin");
+        Directory.CreateDirectory(targetBin);
+
+        string[] tools =
+        {
+            "as",
+            "ld",
+            "ar",
+            "nm",
+            "ranlib",
+            "objcopy",
+            "objdump",
+            "strip",
+            "size",
+            "readelf"
+        };
+
+        foreach (string tool in tools)
+        {
+            string targetTool = Path.Combine(targetBin, tool + ".exe");
+            if (File.Exists(targetTool))
+            {
+                continue;
+            }
+
+            string prefixedTool = Path.Combine(hostBin, "riscv32-unknown-elf-" + tool + ".exe");
+            if (File.Exists(prefixedTool))
+            {
+                File.Copy(prefixedTool, targetTool, true);
             }
         }
     }

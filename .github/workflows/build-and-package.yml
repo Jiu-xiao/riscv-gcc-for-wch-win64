@@ -127,19 +127,20 @@ jobs:
           '@ | Set-Content -Path $installCmd -Encoding Ascii
 
           $cfg = Join-Path $bundleDir "sfx-config.txt"
-          @'
-          ;!@Install@!UTF-8!
-          Title="RISC-V Toolchain Installer"
-          GUIMode="2"
-          RunProgram="bundle\\install.cmd"
-          ;!@InstallEnd@!
-          '@ | Set-Content -Path $cfg -Encoding Ascii
+          $cfgLines = @(
+            ';!@Install@!UTF-8!',
+            'Title="RISC-V Toolchain Installer"',
+            'GUIMode="2"',
+            'RunProgram="cmd /c %%T\\bundle\\install.cmd"',
+            ';!@InstallEnd@!'
+          )
+          Set-Content -Path $cfg -Encoding Ascii -Value $cfgLines
 
           $archive = Join-Path $bundleDir "payload.7z"
           if (Test-Path $archive) { Remove-Item -Force $archive }
 
           Push-Location out
-          & "$env:ProgramFiles\7-Zip\7z.exe" a -t7z -mx=9 "$archive" "riscv\*" "installer\riscv-toolchain-installer.exe" "bundle\install.cmd"
+          & "$env:ProgramFiles\7-Zip\7z.exe" a -t7z -mx=9 -ms=off -snh- "$archive" "riscv\*" "installer\riscv-toolchain-installer.exe" "bundle\install.cmd"
           if ($LASTEXITCODE -ne 0) {
             throw "7z archive failed with rc=$LASTEXITCODE"
           }
@@ -184,17 +185,72 @@ jobs:
           }
 
           $installDir = Join-Path $pwd "out\full-install-test"
+          $extractDir = Join-Path $pwd "out\full-extract-test"
           if (Test-Path $installDir) {
             Remove-Item -Recurse -Force $installDir
           }
+          if (Test-Path $extractDir) {
+            Remove-Item -Recurse -Force $extractDir
+          }
 
-          & $fullExe --silent --target $installDir --no-path
+          & $fullExe -y "-o$extractDir"
           if ($LASTEXITCODE -ne 0) {
-            throw "Full installer execution failed with rc=$LASTEXITCODE"
+            throw "Full installer extraction failed with rc=$LASTEXITCODE"
+          }
+
+          $extractedInstaller = Join-Path $extractDir "installer\riscv-toolchain-installer.exe"
+          $extractedSource = Join-Path $extractDir "riscv"
+          $requiredInExtract = @(
+            (Join-Path $extractedSource "bin\riscv32-unknown-elf-gcc.exe"),
+            (Join-Path $extractedSource "bin\riscv32-unknown-elf-g++.exe"),
+            (Join-Path $extractedSource "bin\riscv32-unknown-elf-gdb.exe"),
+            (Join-Path $extractedSource "bin\riscv32-unknown-elf-readelf.exe"),
+            (Join-Path $extractedSource "bin\libstdc++-6.dll"),
+            (Join-Path $extractedSource "bin\libgcc_s_seh-1.dll"),
+            (Join-Path $extractedSource "riscv32-unknown-elf\include\stdio.h"),
+            (Join-Path $extractedSource "riscv32-unknown-elf\lib\libstdc++.a")
+          )
+          $waitSeconds = 300
+          for ($i = 0; $i -lt $waitSeconds; $i++) {
+            $ready = (Test-Path $extractedInstaller)
+            if ($ready) {
+              foreach ($path in $requiredInExtract) {
+                if (!(Test-Path $path)) {
+                  $ready = $false
+                  break
+                }
+              }
+            }
+            if ($ready) {
+              break
+            }
+            Start-Sleep -Seconds 1
+          }
+          if (!(Test-Path $extractedInstaller)) {
+            throw "Extracted installer missing: $extractedInstaller"
+          }
+          foreach ($path in $requiredInExtract) {
+            if (!(Test-Path $path)) {
+              throw "Extracted toolchain missing file: $path"
+            }
+          }
+
+          & $extractedInstaller --silent --source $extractedSource --target $installDir --no-path
+          if ($LASTEXITCODE -ne 0) {
+            throw "Extracted installer execution failed with rc=$LASTEXITCODE"
+          }
+
+          $gccInInstall = Join-Path $installDir "bin\riscv32-unknown-elf-gcc.exe"
+          $waitSeconds = 180
+          for ($i = 0; $i -lt $waitSeconds; $i++) {
+            if (Test-Path $gccInInstall) {
+              break
+            }
+            Start-Sleep -Seconds 1
           }
 
           $required = @(
-            (Join-Path $installDir "bin\riscv32-unknown-elf-gcc.exe"),
+            $gccInInstall,
             (Join-Path $installDir "bin\riscv32-unknown-elf-g++.exe"),
             (Join-Path $installDir "bin\riscv32-unknown-elf-gdb.exe"),
             (Join-Path $installDir "bin\riscv32-unknown-elf-readelf.exe"),

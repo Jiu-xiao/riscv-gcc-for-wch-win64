@@ -74,11 +74,41 @@ run_wine_with_retries() {
   return "$rc"
 }
 
+extract_depfile_from_args() {
+  local expect_mf=0 arg
+  for arg in "$@"; do
+    if [ "$expect_mf" -eq 1 ]; then
+      echo "$arg"
+      return 0
+    fi
+    case "$arg" in
+      -MF)
+        expect_mf=1
+        ;;
+      -MF?*)
+        echo "${arg#-MF}"
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+sanitize_depfile_for_make() {
+  local dep="$1"
+  [ -n "$dep" ] || return 0
+  [ -f "$dep" ] || return 0
+  # GCC under Wine can emit CRLF + drive-letter prerequisites (for example
+  # "Z:\...") that GNU make parses as a static pattern rule and aborts.
+  # Normalize paths so dep files are parseable on Linux-hosted make.
+  perl -i -pe "s/\r$//; s{(^|[ \t\\\\])([A-Za-z]):\\\\+}{\$1/}g; s{\\\\}{/}g" "$dep" || true
+}
+
 run_gcc_tool() {
   local exe="$1"
   shift
   local dir win_dir win_gas win_ld sysroot sysinc_win
-  local need_cc1
+  local need_cc1 dep_file rc
   local -a extra_args
   for dir in "${gcc_dirs[@]}"; do
     if [ -f "${dir}/${exe}" ]; then
@@ -125,8 +155,16 @@ run_gcc_tool() {
           extra_args=(--sysroot="${sysroot}" -isystem "${sysinc_win}")
           ;;
       esac
+      dep_file=""
+      if dep_file=$(extract_depfile_from_args "$@"); then
+        :
+      fi
       run_wine_with_retries "${dir}/${exe}" "${extra_args[@]}" "$@"
-      return $?
+      rc=$?
+      if [ "$rc" -eq 0 ] && [ -n "$dep_file" ]; then
+        sanitize_depfile_for_make "$dep_file"
+      fi
+      return "$rc"
     fi
   done
   return 1
@@ -288,6 +326,9 @@ run_make_with_retries() {
   local current_jobs="$jobs"
   local attempt
   for attempt in $(seq 1 "$MAKE_RETRIES"); do
+    # Retry in the same tree can pick up stale malformed dep files from a prior
+    # failed Wine run. Remove them before each attempt.
+    find /src/build-gcc-newlib-stage2 -type f -name '*.dep' -delete 2>/dev/null || true
     if make -j"$current_jobs" CONFIGURE_HOST=--host=x86_64-w64-mingw32 "$@"; then
       return 0
     else
@@ -432,20 +473,6 @@ done < <(riscv32-unknown-elf-gcc --print-multi-lib)
 if [ ! -f /src/gcc/libgcc/gthr-default.h ]; then
   cp -f /src/gcc/libgcc/gthr-single.h /src/gcc/libgcc/gthr-default.h
 fi
-
-# Work around sporadic malformed dependency files in libgcc multilib builds
-# under Wine-hosted target tools. "*.dep" files are optional for dependency
-# tracking at this stage, and removing them avoids make parser errors.
-dep_sanitize_loop() (
-  set +x
-  while true; do
-    find /src/build-gcc-newlib-stage2 -type f -name '*.dep' -delete 2>/dev/null || true
-    sleep 1
-  done
-)
-dep_sanitize_loop &
-DEP_SANITIZE_PID=$!
-trap 'kill "$DEP_SANITIZE_PID" >/dev/null 2>&1 || true' EXIT
 
 # Continue full build and install (retry for transient Wine/CreateProcess failures).
 run_make_with_retries "${JOBS_FINAL}"

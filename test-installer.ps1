@@ -92,6 +92,7 @@ $required = @(
   (Join-Path $InstallDir "bin\\libstdc++-6.dll"),
   (Join-Path $InstallDir "bin\\libgcc_s_seh-1.dll"),
   (Join-Path $InstallDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
+  (Join-Path $InstallDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"),
   (Join-Path $InstallDir "riscv32-unknown-elf\\include\\stdio.h"),
   (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\libstdc++.a")
 )
@@ -121,6 +122,15 @@ Set-Content -Path $helloC -Value "int main(void){return 0;}" -NoNewline
 & (Join-Path $InstallDir "bin\\riscv32-unknown-elf-gcc.exe") -march=rv32imac -mabi=ilp32 -Os $helloC -o $helloElf
 if ($LASTEXITCODE -ne 0) {
   throw "gcc hello build failed"
+}
+
+$helloCpp = Join-Path $InstallDir "hello.cpp"
+$helloCppElf = Join-Path $InstallDir "hello-cpp.elf"
+Set-Content -Path $helloCpp -Value "int main(){return 0;}" -NoNewline -Encoding Ascii
+
+& (Join-Path $InstallDir "bin\\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 -Os $helloCpp -o $helloCppElf
+if ($LASTEXITCODE -ne 0) {
+  throw "g++ hello build failed"
 }
 
 $elfHeader = & (Join-Path $InstallDir "bin\\riscv32-unknown-elf-readelf.exe") -h $helloElf

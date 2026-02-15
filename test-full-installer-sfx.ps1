@@ -145,6 +145,7 @@ $requiredInExtract = @(
   (Join-Path $extractedSource "bin\\libstdc++-6.dll"),
   (Join-Path $extractedSource "bin\\libgcc_s_seh-1.dll"),
   (Join-Path $extractedSource "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
+  (Join-Path $extractedSource "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"),
   (Join-Path $extractedSource "riscv32-unknown-elf\\include\\stdio.h"),
   (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\libstdc++.a")
 )
@@ -195,6 +196,7 @@ $required = @(
   (Join-Path $installDir "bin\\libstdc++-6.dll"),
   (Join-Path $installDir "bin\\libgcc_s_seh-1.dll"),
   (Join-Path $installDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
+  (Join-Path $installDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"),
   (Join-Path $installDir "riscv32-unknown-elf\\include\\stdio.h"),
   (Join-Path $installDir "riscv32-unknown-elf\\lib\\libstdc++.a")
 )
@@ -221,6 +223,15 @@ Set-Content -Path $helloC -Value "int main(void){return 0;}" -NoNewline -Encodin
 & (Join-Path $installDir "bin\\riscv32-unknown-elf-gcc.exe") -march=rv32imac -mabi=ilp32 -Os $helloC -o $helloElf
 if ($LASTEXITCODE -ne 0) {
   throw "hello compile failed"
+}
+
+$helloCpp = Join-Path $installDir "hello-full.cpp"
+$helloCppElf = Join-Path $installDir "hello-full-cpp.elf"
+Set-Content -Path $helloCpp -Value "int main(){return 0;}" -NoNewline -Encoding Ascii
+
+& (Join-Path $installDir "bin\\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 -Os $helloCpp -o $helloCppElf
+if ($LASTEXITCODE -ne 0) {
+  throw "hello c++ compile failed"
 }
 
 $elfHeader = & (Join-Path $installDir "bin\\riscv32-unknown-elf-readelf.exe") -h $helloElf

@@ -46,6 +46,7 @@ jobs:
           test -f out/riscv/bin/libstdc++-6.dll
           test -f out/riscv/bin/libgcc_s_seh-1.dll
           test -f out/riscv/libexec/gcc/riscv32-unknown-elf/15.2.0/cc1.exe
+          test -f out/riscv/libexec/gcc/riscv32-unknown-elf/15.2.0/cc1plus.exe
 
       - name: Upload toolchain artifact
         uses: actions/upload-artifact@v4
@@ -80,7 +81,8 @@ jobs:
             "out\\riscv\\bin\\riscv32-unknown-elf-readelf.exe",
             "out\\riscv\\bin\\libstdc++-6.dll",
             "out\\riscv\\bin\\libgcc_s_seh-1.dll",
-            "out\\riscv\\libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"
+            "out\\riscv\\libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe",
+            "out\\riscv\\libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"
           )
           foreach ($path in $required) {
             if (!(Test-Path $path)) {
@@ -210,6 +212,7 @@ jobs:
             (Join-Path $extractedSource "bin\libstdc++-6.dll"),
             (Join-Path $extractedSource "bin\libgcc_s_seh-1.dll"),
             (Join-Path $extractedSource "libexec\gcc\riscv32-unknown-elf\15.2.0\cc1.exe"),
+            (Join-Path $extractedSource "libexec\gcc\riscv32-unknown-elf\15.2.0\cc1plus.exe"),
             (Join-Path $extractedSource "riscv32-unknown-elf\include\stdio.h"),
             (Join-Path $extractedSource "riscv32-unknown-elf\lib\libstdc++.a")
           )
@@ -260,6 +263,7 @@ jobs:
             (Join-Path $installDir "bin\libstdc++-6.dll"),
             (Join-Path $installDir "bin\libgcc_s_seh-1.dll"),
             (Join-Path $installDir "libexec\gcc\riscv32-unknown-elf\15.2.0\cc1.exe"),
+            (Join-Path $installDir "libexec\gcc\riscv32-unknown-elf\15.2.0\cc1plus.exe"),
             (Join-Path $installDir "riscv32-unknown-elf\include\stdio.h"),
             (Join-Path $installDir "riscv32-unknown-elf\lib\libstdc++.a")
           )
@@ -285,6 +289,15 @@ jobs:
           & (Join-Path $installDir "bin\riscv32-unknown-elf-gcc.exe") -march=rv32imac -mabi=ilp32 -Os $helloC -o $helloElf
           if ($LASTEXITCODE -ne 0) {
             throw "full installer hello compile failed"
+          }
+
+          $helloCpp = Join-Path $installDir "hello-full.cpp"
+          $helloCppElf = Join-Path $installDir "hello-full-cpp.elf"
+          Set-Content -Path $helloCpp -Value "int main(){return 0;}" -NoNewline -Encoding Ascii
+
+          & (Join-Path $installDir "bin\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 -Os $helloCpp -o $helloCppElf
+          if ($LASTEXITCODE -ne 0) {
+            throw "full installer c++ hello compile failed"
           }
 
           $elfHeader = & (Join-Path $installDir "bin\riscv32-unknown-elf-readelf.exe") -h $helloElf

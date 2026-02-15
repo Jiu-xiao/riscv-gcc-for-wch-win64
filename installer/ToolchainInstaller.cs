@@ -270,7 +270,8 @@ internal static class Program
             Path.Combine(installRoot, "bin", "riscv32-unknown-elf-readelf.exe"),
             Path.Combine(installRoot, "bin", "libstdc++-6.dll"),
             Path.Combine(installRoot, "bin", "libgcc_s_seh-1.dll"),
-            Path.Combine(installRoot, "libexec", "gcc", "riscv32-unknown-elf", "15.2.0", "cc1.exe")
+            Path.Combine(installRoot, "libexec", "gcc", "riscv32-unknown-elf", "15.2.0", "cc1.exe"),
+            Path.Combine(installRoot, "libexec", "gcc", "riscv32-unknown-elf", "15.2.0", "cc1plus.exe")
         };
 
         foreach (string file in required)

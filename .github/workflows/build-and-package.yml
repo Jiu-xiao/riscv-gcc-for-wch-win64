@@ -68,6 +68,24 @@ jobs:
           name: riscv-toolchain-dir
           path: out/riscv
 
+      - name: Verify downloaded toolchain files
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $required = @(
+            "out\\riscv\\bin\\riscv32-unknown-elf-gcc.exe",
+            "out\\riscv\\bin\\riscv32-unknown-elf-g++.exe",
+            "out\\riscv\\bin\\riscv32-unknown-elf-gdb.exe",
+            "out\\riscv\\bin\\riscv32-unknown-elf-readelf.exe",
+            "out\\riscv\\bin\\libstdc++-6.dll",
+            "out\\riscv\\bin\\libgcc_s_seh-1.dll"
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) {
+              throw "Missing downloaded toolchain file: $path"
+            }
+          }
+
       - name: Build installer exe
         shell: powershell
         run: |
@@ -132,9 +150,25 @@ jobs:
           }
 
           $fullExe = Join-Path $releaseDir "riscv-toolchain-full-installer.exe"
-          cmd /c copy /b /y "$sfx+$cfg+$archive" "$fullExe"
-          if ($LASTEXITCODE -ne 0) {
-            throw "SFX combine failed with rc=$LASTEXITCODE"
+          if (Test-Path $fullExe) { Remove-Item -Force $fullExe }
+
+          $parts = @($sfx, $cfg, $archive)
+          $outStream = [System.IO.File]::Open($fullExe, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+          try {
+            foreach ($part in $parts) {
+              $inStream = [System.IO.File]::Open($part, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+              try {
+                $inStream.CopyTo($outStream)
+              } finally {
+                $inStream.Dispose()
+              }
+            }
+          } finally {
+            $outStream.Dispose()
+          }
+
+          if (!(Test-Path $fullExe)) {
+            throw "SFX combine did not create output: $fullExe"
           }
 
           Get-Item $fullExe | Select-Object FullName, Length | Format-Table -AutoSize

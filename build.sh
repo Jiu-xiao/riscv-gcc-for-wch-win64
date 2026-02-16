@@ -375,7 +375,7 @@ ensure_nano_libs_in_dir() {
 }
 
 ensure_nano_multilib_libs() {
-  local libroot="$prefix/riscv32-unknown-elf/lib"
+  local libroot="/opt/riscv/riscv32-unknown-elf/lib"
   local ml mld dir rc=0
 
   ensure_nano_libs_in_dir "$libroot" || rc=1

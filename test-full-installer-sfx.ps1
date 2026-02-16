@@ -147,7 +147,13 @@ $requiredInExtract = @(
   (Join-Path $extractedSource "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
   (Join-Path $extractedSource "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"),
   (Join-Path $extractedSource "riscv32-unknown-elf\\include\\stdio.h"),
-  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\libstdc++.a")
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\libstdc++.a"),
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libc_nano.a"),
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libm_nano.a"),
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libgloss_nano.a"),
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libc_nano.a"),
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libm_nano.a"),
+  (Join-Path $extractedSource "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libgloss_nano.a")
 )
 $waitSeconds = 300
 for ($i = 0; $i -lt $waitSeconds; $i++) {
@@ -198,7 +204,13 @@ $required = @(
   (Join-Path $installDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
   (Join-Path $installDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"),
   (Join-Path $installDir "riscv32-unknown-elf\\include\\stdio.h"),
-  (Join-Path $installDir "riscv32-unknown-elf\\lib\\libstdc++.a")
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\libstdc++.a"),
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libc_nano.a"),
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libm_nano.a"),
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libgloss_nano.a"),
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libc_nano.a"),
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libm_nano.a"),
+  (Join-Path $installDir "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libgloss_nano.a")
 )
 foreach ($path in $required) {
   if (-not (Test-Path $path)) {
@@ -232,6 +244,24 @@ Set-Content -Path $helloCpp -Value "int main(){return 0;}" -NoNewline -Encoding 
 & (Join-Path $installDir "bin\\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 -Os $helloCpp -o $helloCppElf
 if ($LASTEXITCODE -ne 0) {
   throw "hello c++ compile failed"
+}
+
+$helloNanoImacElf = Join-Path $installDir "hello-full-nano-imac.elf"
+& (Join-Path $installDir "bin\\riscv32-unknown-elf-gcc.exe") -march=rv32imac -mabi=ilp32 --specs=nano.specs -Os $helloC -o $helloNanoImacElf
+if ($LASTEXITCODE -ne 0) {
+  throw "hello nano compile failed for rv32imac/ilp32"
+}
+
+$helloNanoImafcElf = Join-Path $installDir "hello-full-nano-imafc.elf"
+& (Join-Path $installDir "bin\\riscv32-unknown-elf-gcc.exe") -march=rv32imafc -mabi=ilp32f --specs=nano.specs -Os $helloC -o $helloNanoImafcElf
+if ($LASTEXITCODE -ne 0) {
+  throw "hello nano compile failed for rv32imafc/ilp32f"
+}
+
+$helloCppNanoElf = Join-Path $installDir "hello-full-cpp-nano.elf"
+& (Join-Path $installDir "bin\\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 --specs=nano.specs -Os $helloCpp -o $helloCppNanoElf
+if ($LASTEXITCODE -ne 0) {
+  throw "hello c++ nano compile failed"
 }
 
 $elfHeader = & (Join-Path $installDir "bin\\riscv32-unknown-elf-readelf.exe") -h $helloElf

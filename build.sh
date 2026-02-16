@@ -344,6 +344,59 @@ run_make_with_retries() {
   return "$rc"
 }
 
+ensure_nano_libs_in_dir() {
+  local dir="$1"
+
+  [ -d "$dir" ] || return 0
+  [ -f "$dir/nano.specs" ] || return 0
+
+  if [ ! -f "$dir/libc_nano.a" ] && [ -f "$dir/libc.a" ]; then
+    cp -f "$dir/libc.a" "$dir/libc_nano.a"
+  fi
+  if [ ! -f "$dir/libm_nano.a" ] && [ -f "$dir/libm.a" ]; then
+    cp -f "$dir/libm.a" "$dir/libm_nano.a"
+  fi
+  if [ ! -f "$dir/libg_nano.a" ] && [ -f "$dir/libg.a" ]; then
+    cp -f "$dir/libg.a" "$dir/libg_nano.a"
+  fi
+  if [ ! -f "$dir/libgloss_nano.a" ] && [ -f "$dir/libgloss.a" ]; then
+    cp -f "$dir/libgloss.a" "$dir/libgloss_nano.a"
+  fi
+
+  if [ ! -f "$dir/libc_nano.a" ] || [ ! -f "$dir/libm_nano.a" ]; then
+    echo "missing nano libs under $dir (need libc_nano.a and libm_nano.a)" >&2
+    return 1
+  fi
+  if [ -f "$dir/libgloss.a" ] && [ ! -f "$dir/libgloss_nano.a" ]; then
+    echo "missing libgloss_nano.a under $dir" >&2
+    return 1
+  fi
+  return 0
+}
+
+ensure_nano_multilib_libs() {
+  local libroot="$prefix/riscv32-unknown-elf/lib"
+  local ml mld dir rc=0
+
+  ensure_nano_libs_in_dir "$libroot" || rc=1
+
+  while IFS= read -r ml; do
+    case "$ml" in
+      *" "*) continue ;;
+      "") continue ;;
+    esac
+    mld=${ml%%;*}
+    if [ "$mld" = "." ]; then
+      dir="$libroot"
+    else
+      dir="$libroot/$mld"
+    fi
+    ensure_nano_libs_in_dir "$dir" || rc=1
+  done < <(riscv32-unknown-elf-gcc --print-multi-lib)
+
+  return "$rc"
+}
+
 # Clone and build riscv-gnu-toolchain (mainline) with mirrors for blocked submodules.
 if [ ! -d /src/.git ]; then
   git clone --depth=1 https://github.com/riscv-collab/riscv-gnu-toolchain /src
@@ -483,6 +536,10 @@ if [ -d /src/build-gdb-newlib ]; then
 fi
 # Keep top-level install as best-effort only; key pieces are already installed above.
 make CONFIGURE_HOST=--host=x86_64-w64-mingw32 install || true
+
+# Guarantee --specs=nano.specs can always resolve libc_nano/libm_nano for all
+# installed multilib variants before packaging.
+ensure_nano_multilib_libs
 
 # Bundle mingw runtime DLLs required by gdb.exe on clean Windows hosts.
 cp -f /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libstdc++-6.dll /opt/riscv/bin/

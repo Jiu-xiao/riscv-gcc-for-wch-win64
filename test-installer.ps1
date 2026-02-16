@@ -94,7 +94,13 @@ $required = @(
   (Join-Path $InstallDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1.exe"),
   (Join-Path $InstallDir "libexec\\gcc\\riscv32-unknown-elf\\15.2.0\\cc1plus.exe"),
   (Join-Path $InstallDir "riscv32-unknown-elf\\include\\stdio.h"),
-  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\libstdc++.a")
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\libstdc++.a"),
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libc_nano.a"),
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libm_nano.a"),
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\rv32imac_zaamo_zalrsc\\ilp32\\libgloss_nano.a"),
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libc_nano.a"),
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libm_nano.a"),
+  (Join-Path $InstallDir "riscv32-unknown-elf\\lib\\rv32imafc_zicsr_zaamo_zalrsc\\ilp32f\\libgloss_nano.a")
 )
 
 Write-Host "==> Verifying installed files..."
@@ -131,6 +137,24 @@ Set-Content -Path $helloCpp -Value "int main(){return 0;}" -NoNewline -Encoding 
 & (Join-Path $InstallDir "bin\\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 -Os $helloCpp -o $helloCppElf
 if ($LASTEXITCODE -ne 0) {
   throw "g++ hello build failed"
+}
+
+$helloNanoImacElf = Join-Path $InstallDir "hello-nano-imac.elf"
+& (Join-Path $InstallDir "bin\\riscv32-unknown-elf-gcc.exe") -march=rv32imac -mabi=ilp32 --specs=nano.specs -Os $helloC -o $helloNanoImacElf
+if ($LASTEXITCODE -ne 0) {
+  throw "gcc nano hello build failed for rv32imac/ilp32"
+}
+
+$helloNanoImafcElf = Join-Path $InstallDir "hello-nano-imafc.elf"
+& (Join-Path $InstallDir "bin\\riscv32-unknown-elf-gcc.exe") -march=rv32imafc -mabi=ilp32f --specs=nano.specs -Os $helloC -o $helloNanoImafcElf
+if ($LASTEXITCODE -ne 0) {
+  throw "gcc nano hello build failed for rv32imafc/ilp32f"
+}
+
+$helloCppNanoElf = Join-Path $InstallDir "hello-cpp-nano.elf"
+& (Join-Path $InstallDir "bin\\riscv32-unknown-elf-g++.exe") -march=rv32imac -mabi=ilp32 --specs=nano.specs -Os $helloCpp -o $helloCppNanoElf
+if ($LASTEXITCODE -ne 0) {
+  throw "g++ nano hello build failed"
 }
 
 $elfHeader = & (Join-Path $InstallDir "bin\\riscv32-unknown-elf-readelf.exe") -h $helloElf
